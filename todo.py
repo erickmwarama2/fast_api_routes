@@ -1,18 +1,30 @@
-from fastapi import APIRouter, Path, HTTPException, status
-from models import Todo, TodoItems
+from fastapi import APIRouter, Depends, Path, HTTPException, Request, status
+from fastapi.templating import Jinja2Templates
+from models import Todo, TodoItems, Item
 
 todo_router = APIRouter()
 
 todo_list = []
+templates = Jinja2Templates(directory="templates/")
 
 @todo_router.post("/todo", status_code=201)
-async def add_todo(todo: Todo) -> dict:
+async def add_todo(request: Request, todo: Todo = Depends(Todo.as_form)):
+    print(f"The item: ${todo}")
+    todo.id = len(todo_list) + 1
     todo_list.append(todo)
-    return {"message":"Todo item added successfully"}
+
+    return templates.TemplateResponse("todo.html", {
+        "todos": todo_list,
+        "request": request
+    })
 
 @todo_router.get("/todo", response_model=TodoItems)
-async def retrieve_todos() -> dict:
-    return {"todos": todo_list}
+async def retrieve_todos(request: Request):
+    print("received the request")
+    return templates.TemplateResponse("todo.html", {
+        "request": request,
+        "todos": todo_list
+    })
 
 @todo_router.delete("/todo/{todo_id}")
 async def delete_single_todo(todo_id: int = Path(..., title="ID of the todo item to be deleted")) -> dict:
@@ -48,12 +60,13 @@ async def update_todo(todo_data: Todo, todo_id: int = Path(..., title="the ID of
         )
 
 @todo_router.get("/todo/{todo_id}")
-async def get_single_todo(todo_id: int = Path(..., title="The ID of the todo to retrieve")) -> dict:
+async def get_single_todo(request: Request, todo_id: int = Path(..., title="The ID of the todo to retrieve")) -> dict:
     for todo in todo_list:
         if todo.id == todo_id:
-            return {
+            return templates.TemplateResponse("todo.html", {
+                "request": request,
                 "todo": todo
-            }
+            })
 
 
     raise HTTPException(
